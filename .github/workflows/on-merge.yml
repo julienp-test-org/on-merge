@@ -95,5 +95,4 @@ jobs:
         if: ${{ needs.work.result != 'success' }}
         run: exit 1
       - name: CI succeeded
-      - name: CI succeeded
         run: exit 0
