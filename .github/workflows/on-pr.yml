@@ -4,8 +4,8 @@ on:
   pull_request:
 
 jobs:
-  hello:
-    name: Hello
+  info:
+    name: info
     runs-on: ubuntu-latest
     steps:
       - name: Print Hello World
