@@ -73,9 +73,16 @@ jobs:
             echo "Not a release PR. Skipping queue position check."
           fi
 
+  work:
+    name: work
+    runs-on: ubuntu-latest
+    steps:
+      - name: Doing some work
+        run: sleep 60
+
   info:
     name: info
-    needs: release-pr-check
+    needs: [release-pr-check, work]
     if: always() # always report a status
     runs-on: ubuntu-latest
     steps:
@@ -83,6 +90,9 @@ jobs:
         run: echo "hello world"
       - name: CI failed
         if: ${{ needs.release-pr-check.result != 'success' }}
+        run: exit 1
+      - name: CI failed
+        if: ${{ needs.work.result != 'success' }}
         run: exit 1
       - name: CI succeeded
         run: exit 0
