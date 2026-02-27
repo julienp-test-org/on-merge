@@ -82,10 +82,7 @@ jobs:
       - name: Print Hello World
         run: echo "hello world"
       - name: CI failed
-        if: ${{ needs.ci.result != 'success' }}
-        run: exit 1
-      - name: Release failed
-        if: ${{ needs.prepare-release.result != 'success' }}
+        if: ${{ needs.release-pr-check.result != 'success' }}
         run: exit 1
       - name: CI succeeded
         run: exit 0
