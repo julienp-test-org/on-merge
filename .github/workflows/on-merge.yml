@@ -29,7 +29,8 @@ jobs:
       - name: Check if release PR is first in merge queue
         env:
           HEAD_COMMIT_MESSAGE: ${{ github.event.merge_group.head_commit.message }}
-          BASE_REF: ${{ github.event.merge_group.base_ref }}
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.merge_group.head_sha }}
           GH_REF: ${{ github.ref }}
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -37,13 +38,12 @@ jobs:
           if echo "$HEAD_COMMIT_MESSAGE" | grep -qE '^(Freeze v[0-9]+\.[0-9]+\.[0-9]+|Changelog and go\.mod updates for v[0-9]+\.[0-9]+\.[0-9]+)'; then
             echo "This is a release PR: $HEAD_COMMIT_MESSAGE"
             echo "Checking if there are other PRs ahead in the merge queue..."
+            echo "Base SHA: $BASE_SHA"
+            echo "Head SHA: $HEAD_SHA"
 
-            # Fetch the base branch to compare against
-            git fetch origin "$BASE_REF"
-
-            # Count commits between the base branch and HEAD
-            COMMIT_COUNT=$(git rev-list --count "origin/$BASE_REF"..HEAD)
-            echo "Commits between origin/$BASE_REF and HEAD: $COMMIT_COUNT"
+            # Count commits between the base SHA and head SHA
+            COMMIT_COUNT=$(git rev-list --count "$BASE_SHA".."$HEAD_SHA")
+            echo "Commits between $BASE_SHA and $HEAD_SHA: $COMMIT_COUNT"
             if [ "$COMMIT_COUNT" -gt 1 ]; then
               echo "::error::Release PR detected but there are other PRs ahead in the merge queue ($COMMIT_COUNT commits found, expected 1). Release PRs must be first in the queue."
 
@@ -57,7 +57,8 @@ jobs:
                   echo "This release PR cannot proceed because there are other PRs ahead in the merge queue."
                   echo ""
                   echo "- **Commits found:** $COMMIT_COUNT (expected 1)"
-                  echo "- **Base branch:** \`$BASE_REF\`"
+                  echo "- **Base SHA:** \`$BASE_SHA\`"
+                  echo "- **Head SHA:** \`$HEAD_SHA\`"
                   echo ""
                   echo "**Action required:** Please wait for the merge queue to clear, or remove other PRs from the queue, then re-add this PR."
                 } > /tmp/pr-comment.md
@@ -75,7 +76,13 @@ jobs:
   info:
     name: info
     needs: release-pr-check
+    if: always() # always report a status
     runs-on: ubuntu-latest
     steps:
       - name: Print Hello World
         run: echo "hello world"
+      - name: CI failed
+        if: ${{ needs.release-pr-check.result != 'success' }}
+        run: exit 1
+      - name: CI succeeded
+        run: exit 0
