@@ -29,7 +29,7 @@ jobs:
       - name: Check if release PR is first in merge queue
         env:
           HEAD_COMMIT_MESSAGE: ${{ github.event.merge_group.head_commit.message }}
-          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          BASE_REF: ${{ github.event.merge_group.base_ref }}
           HEAD_SHA: ${{ github.event.merge_group.head_sha }}
           GH_REF: ${{ github.ref }}
           GH_TOKEN: ${{ github.token }}
@@ -38,12 +38,18 @@ jobs:
           if echo "$HEAD_COMMIT_MESSAGE" | grep -qE '^(Freeze v[0-9]+\.[0-9]+\.[0-9]+|Changelog and go\.mod updates for v[0-9]+\.[0-9]+\.[0-9]+)'; then
             echo "This is a release PR: $HEAD_COMMIT_MESSAGE"
             echo "Checking if there are other PRs ahead in the merge queue..."
-            echo "Base SHA: $BASE_SHA"
+
+            # Strip refs/heads/ prefix from BASE_REF to get branch name
+            BASE_BRANCH="${BASE_REF#refs/heads/}"
+            echo "Base branch: $BASE_BRANCH"
             echo "Head SHA: $HEAD_SHA"
 
-            # Count commits between the base SHA and head SHA
-            COMMIT_COUNT=$(git rev-list --count "$BASE_SHA".."$HEAD_SHA")
-            echo "Commits between $BASE_SHA and $HEAD_SHA: $COMMIT_COUNT"
+            # Fetch the actual base branch (main/master) to compare against
+            git fetch origin "$BASE_BRANCH"
+
+            # Count commits between the actual base branch and head SHA
+            COMMIT_COUNT=$(git rev-list --count "origin/$BASE_BRANCH".."$HEAD_SHA")
+            echo "Commits between origin/$BASE_BRANCH and $HEAD_SHA: $COMMIT_COUNT"
             if [ "$COMMIT_COUNT" -gt 1 ]; then
               echo "::error::Release PR detected but there are other PRs ahead in the merge queue ($COMMIT_COUNT commits found, expected 1). Release PRs must be first in the queue."
 
@@ -57,7 +63,7 @@ jobs:
                   echo "This release PR cannot proceed because there are other PRs ahead in the merge queue."
                   echo ""
                   echo "- **Commits found:** $COMMIT_COUNT (expected 1)"
-                  echo "- **Base SHA:** \`$BASE_SHA\`"
+                  echo "- **Base branch:** \`$BASE_BRANCH\`"
                   echo "- **Head SHA:** \`$HEAD_SHA\`"
                   echo ""
                   echo "**Action required:** Please wait for the merge queue to clear, or remove other PRs from the queue, then re-add this PR."
