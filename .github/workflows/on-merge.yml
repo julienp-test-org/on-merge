@@ -1,0 +1,80 @@
+name: Merge
+
+permissions:
+  # To post comments on PRs.
+  pull-requests: write
+
+on:
+  merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release-pr-check:
+    name: Release PR Queue Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print GitHub Context
+        run: echo '${{ toJSON(github) }}'
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check if release PR is first in merge queue
+        env:
+          HEAD_COMMIT_MESSAGE: ${{ github.event.merge_group.head_commit.message }}
+          BASE_REF: ${{ github.event.merge_group.base_ref }}
+          GH_REF: ${{ github.ref }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Check if this is a release PR (Freeze or Changelog update)
+          if echo "$HEAD_COMMIT_MESSAGE" | grep -qE '^(Freeze v[0-9]+\.[0-9]+\.[0-9]+|Changelog and go\.mod updates for v[0-9]+\.[0-9]+\.[0-9]+)'; then
+            echo "This is a release PR: $HEAD_COMMIT_MESSAGE"
+            echo "Checking if there are other PRs ahead in the merge queue..."
+
+            # Fetch the base branch to compare against
+            git fetch origin "$BASE_REF"
+
+            # Count commits between the base branch and HEAD
+            COMMIT_COUNT=$(git rev-list --count "origin/$BASE_REF"..HEAD)
+            echo "Commits between origin/$BASE_REF and HEAD: $COMMIT_COUNT"
+            if [ "$COMMIT_COUNT" -gt 1 ]; then
+              echo "::error::Release PR detected but there are other PRs ahead in the merge queue ($COMMIT_COUNT commits found, expected 1). Release PRs must be first in the queue."
+
+              # Extract PR number from merge group ref (format: refs/heads/gh-readonly-queue/<base>/pr-<number>-<sha>)
+              PR_NUMBER=$(echo "$GH_REF" | grep -oE 'pr-[0-9]+' | grep -oE '[0-9]+')
+
+              if [ -n "$PR_NUMBER" ]; then
+                {
+                  echo "❌ **Release PR Queue Check Failed**"
+                  echo ""
+                  echo "This release PR cannot proceed because there are other PRs ahead in the merge queue."
+                  echo ""
+                  echo "- **Commits found:** $COMMIT_COUNT (expected 1)"
+                  echo "- **Base branch:** \`$BASE_REF\`"
+                  echo ""
+                  echo "**Action required:** Please wait for the merge queue to clear, or remove other PRs from the queue, then re-add this PR."
+                } > /tmp/pr-comment.md
+                gh pr comment "$PR_NUMBER" --body-file /tmp/pr-comment.md
+              fi
+
+              exit 1
+            fi
+
+            echo "Release PR is first in the merge queue. Proceeding."
+          else
+            echo "Not a release PR. Skipping queue position check."
+          fi
+
+  info:
+    name: info
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print Hello World
+        run: echo "hello world"
