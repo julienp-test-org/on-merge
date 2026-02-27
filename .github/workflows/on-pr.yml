@@ -1,0 +1,12 @@
+name: PR
+
+on:
+  pull_request:
+
+jobs:
+  info:
+    name: info
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print Hello World
+        run: echo "hello world"

@@ -74,6 +74,7 @@ jobs:
 
   info:
     name: info
+    needs: release-pr-check
     runs-on: ubuntu-latest
     steps:
       - name: Print Hello World
